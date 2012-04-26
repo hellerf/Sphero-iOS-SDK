@@ -12,7 +12,7 @@ Abstract: View to display OpenGL ES teapot, along with UI controls to adjust var
 #import <OpenGLES/ES2/glext.h>
 #import <OpenGLES/EAGLDrawable.h>
 #import <CoreMotion/CoreMotion.h>
-
+#import <RobotKit/RobotKit.h>
 #import "matrix.h"
 
 @interface EAGLView : UIView
@@ -71,6 +71,10 @@ Abstract: View to display OpenGL ES teapot, along with UI controls to adjust var
     float lastX;
     float lastY;
     float lastZ;
+    // last heading the Sphero ball was moving toward
+    float oldHeading;
+    RKAccelerometerFilter* accelerometerFilter;
+    CFAbsoluteTime lastDirectionChangedTime;
  }
 
 @property (readonly, nonatomic, getter=isAnimating) BOOL animating;
@@ -87,5 +91,7 @@ Abstract: View to display OpenGL ES teapot, along with UI controls to adjust var
 
 -(void)enableSpheroStreaming;
 -(void)disableSpheroStreaming;
+
+-(void) spheroChangeDirection;
 
 @end

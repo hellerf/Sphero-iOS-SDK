@@ -1,4 +1,31 @@
-                    _______  _______  ______   _______ __________________         
+                    This sample was jenked up by Forrest Heller (not affiliated with Orbotix);
+		    Instead of simply displaying a teapot this sample now tells Sphero to go
+		    in a random direction until it hits something.  Then Sphero switches 
+		    directions again.  I did this mostly with Jon Carroll standing over my
+		    shoulder telling me what to type to make Sphero go--thanks Jon!
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    
+		    _______  _______  ______   _______ __________________         
                    (  ___  )(  ____ )(  ___ \ (  ___  )\__   __/\__   __/|\     /|
                    | (   ) || (    )|| (   ) )| (   ) |   ) (      ) (   ( \   / )
                    | |   | || (____)|| (__/ / | |   | |   | |      | |    \ (_) / 

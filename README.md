@@ -1,3 +1,8 @@
+# I changed the SphereMotionTeapot sample project
+The SphereMotionTeapot tells your Sphero to move in a random direction.  When Sphero hits something,
+it changes direction again.  Much thanks to Jon Carroll for standing over my shoulder.  Posted
+mainly because Yoav Lurie wanted the code.
+
 ![iosdeveloperheader.jpg](https://github.com/orbotix/Sphero-iOS-SDK/raw/master/assets/image00.jpg)
 
 # iOS Developer Quick Start Guide

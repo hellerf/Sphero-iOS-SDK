@@ -31,7 +31,7 @@ Abstract: CoreMotionTeapot's app delegate.
 {
     //Turn stabilization back on and close the connection if the app is closing or going into the background
 	[glView stopAnimation];
-    [RKStabilizationCommand sendCommandWithState:RKStabilizationStateOn];
+    [RKStabilizationCommand sendCommandWithState:RKStabilizationStateOff];
     [[RKRobotProvider sharedRobotProvider] closeRobotConnection];
 }
 
@@ -75,7 +75,7 @@ Abstract: CoreMotionTeapot's app delegate.
     //Make Sphero yellow
     [RKRGBLEDOutputCommand sendCommandWithRed:1.0 green:1.0 blue:0.0];
     //Turn off stabilization so Sphero doesn't try to right himself
-    [RKStabilizationCommand sendCommandWithState:RKStabilizationStateOff];
+    [RKStabilizationCommand sendCommandWithState:RKStabilizationStateOn];
     
     [glView performSelector:@selector(enableSpheroStreaming) withObject:nil afterDelay:0.1];
 }

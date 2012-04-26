@@ -76,6 +76,9 @@ CMRotationMatrix rotationMatrixFromGravity(float x, float y, float z)
     NSLog(@"Turning on data streaming, divisor %@", [[NSUserDefaults standardUserDefaults] stringForKey:@"rateDivisor"]);
     [[RKDeviceMessenger sharedMessenger] addDataStreamingObserver:self selector:@selector(handleDataStreaming:)];
     [RKSetDataStreamingCommand sendCommandWithSampleRateDivisor:[[[NSUserDefaults standardUserDefaults] stringForKey:@"rateDivisor"] intValue] packetFrames:[[[NSUserDefaults standardUserDefaults] stringForKey:@"framesPacket"] intValue] sensorMask:RKDataStreamingMaskAccelerometerXFiltered | RKDataStreamingMaskAccelerometerYFiltered | RKDataStreamingMaskAccelerometerZFiltered | RKDataStreamingMaskIMUYawAngleFiltered | RKDataStreamingMaskIMUPitchAngleFiltered | RKDataStreamingMaskIMURollAngleFiltered packetCount:[[[NSUserDefaults standardUserDefaults] stringForKey:@"packetCount"] intValue]];
+    /* Go in a random direction */
+    [RKRollCommand sendCommandWithHeading:fabsf(drand48() * 359.0) velocity:fabsf(drand48()*0.3f) + 0.4f];
+
     //END SPHERO SENSOR STREAMING CODE
 }
 
@@ -136,6 +139,14 @@ CMRotationMatrix rotationMatrixFromGravity(float x, float y, float z)
 			return nil;
 		}
 		[self initializeGL];
+        UITextView* closeNicelyLabel = [[UITextView alloc] initWithFrame:CGRectMake(0, self.window.bounds.size.height * 0.5, self.window.bounds.size.width, self.window.bounds.size.height * 0.5)];
+        closeNicelyLabel.backgroundColor = [UIColor blackColor];
+        closeNicelyLabel.textColor = [UIColor redColor];
+        closeNicelyLabel.font = [UIFont fontWithName:@"Arial" size:44];
+        closeNicelyLabel.text = @"\n\n\n\n\n\n\nQuit this app nicely! \nOtherwise you have to reset your Sphero.  To reset your Sphero, put it back on top of the charger for a few seconds until it goes to sleep.  Take it off the \ncharger, and the shake it until it wakes up (flashing lights, a motor turns on).";
+        [self addSubview:closeNicelyLabel];
+        [closeNicelyLabel release];
+        accelerometerFilter = [[RKHighpassFilter alloc] initWithSampleRate:21.0 cutoffFrequency:100.0];
 	}
 	return self;
 }
@@ -227,6 +238,12 @@ CMRotationMatrix rotationMatrixFromGravity(float x, float y, float z)
 	// renderTeapotUsingRotation:andTranslation:translation: will rotate the teapot by the inverse
 	// of rotation and translate it by translation
 	[self renderTeapotUsingRotation:rotation andTranslation:translation];
+    
+    /* If we haven't changed direction in 5 seconds, do so */
+    if (CFAbsoluteTimeGetCurrent() - lastDirectionChangedTime > 5.0) {
+        [self spheroChangeDirection];
+    }
+    
 }
 
 - (void) layoutSubviews
@@ -304,6 +321,17 @@ CMRotationMatrix rotationMatrixFromGravity(float x, float y, float z)
 //Observer method that will be called as sensor data arrives from Sphero
 - (void)handleDataStreaming:(RKDeviceAsyncData *)data
 {
+    static double totalValues = 0;
+    static CFAbsoluteTime valuesStartTime = 0;
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    if (valuesStartTime < 1.0) {
+        valuesStartTime = CFAbsoluteTimeGetCurrent();
+    }
+    totalValues += 1.0;
+    if (now - valuesStartTime > 5.0) {
+//        printf("values per second:%f\n", totalValues / (now - valuesStartTime));
+    }
+    
     //NSLog(@"handleDataStreaming: data - %@", data);
     if ([data isKindOfClass:[RKDeviceSensorsAsyncData class]]) {
         RKDeviceSensorsAsyncData *sensors_data = (RKDeviceSensorsAsyncData *)data;
@@ -311,6 +339,34 @@ CMRotationMatrix rotationMatrixFromGravity(float x, float y, float z)
         for (RKDeviceSensorsData *data in sensors_data.dataFrames) {
             if(accelMode) {
                 RKAccelerometerData *accelerometer_data = data.accelerometerData;
+                CMAcceleration cmAccel;
+                cmAccel.x = accelerometer_data.acceleration.x;
+                cmAccel.y = accelerometer_data.acceleration.y;
+                cmAccel.z = accelerometer_data.acceleration.z;
+                [accelerometerFilter addAcceleration:cmAccel];
+                /* Spike detection: just use a sufficient change in the x or y direction since the last sample.
+                   This is how we detect collisions.  
+                   TODO: when Sphero releases their actually good collision detection, use that.
+                 0.5 was chosen pretty randomly*/
+                /* One problem with this is that Sphero's accelerometer will trigger events as Sphero
+                   starts to change direction, so you have to be careful to not change directions too quickly
+                   based on sensor data */
+                const float ACCELERATION_COLLISION_THRESHOLD = 0.6;
+                static CFAbsoluteTime lastSpikeDetected = 0.0; 
+                if (fabsf(lastX - accelerometer_data.acceleration.x) >= ACCELERATION_COLLISION_THRESHOLD) {
+                    //fabsf(lastY - accelerometer_data.acceleration.y) >= ACCELERATION_COLLISION_THRESHOLD) {
+                    /* Only allow ourselves to detect spikes 400 ms apart */
+                    if (now - lastSpikeDetected > 0.4) {
+                        printf("Spike detected: diff of %f, %f, %f\n", fabsf(lastX - accelerometer_data.acceleration.x), fabsf(lastY - accelerometer_data.acceleration.y),
+                               fabsf(lastZ - accelerometer_data.acceleration.z));
+                        /* Don't change direction twice in more than 700 ms */
+                        if (now - lastDirectionChangedTime > 0.7) {
+                            [self spheroChangeDirection];
+                        }
+                        printf("high pass value: %f %f %f\n", accelerometerFilter.acceleration.x, accelerometerFilter.acceleration.y, accelerometerFilter.acceleration.z);
+                        lastSpikeDetected = now;
+                    }
+                }
                 lastX = accelerometer_data.acceleration.x;
                 lastY = accelerometer_data.acceleration.y;
                 lastZ = (accelerometer_data.acceleration.z * -1.0); //Invert the z axis value
@@ -319,6 +375,23 @@ CMRotationMatrix rotationMatrixFromGravity(float x, float y, float z)
     }
 }
 //END SPHERO SENSOR STREAMING CODE
+
+-(void) spheroChangeDirection {
+    /* Good idea from Jon Carroll: Make sure the new header is sufficiently different from the old one */
+    float newHeading = (float)fabs(drand48() * 360.0);
+    while (fabsf(newHeading - oldHeading) < 140.0) {
+       newHeading = (float)fabs(drand48() * 360);
+    }
+    float newSpeed = fabsf(drand48()*0.2f) + 0.4f;
+    printf("headed to %f\n", newHeading);
+    
+    [RKRollCommand sendCommandWithHeading:newHeading velocity:newSpeed];
+    [RKRollCommand sendCommandWithHeading:newHeading velocity:newSpeed];
+    [RKRollCommand sendCommandWithHeading:newHeading velocity:newSpeed];
+    oldHeading = newHeading;
+    lastDirectionChangedTime = CFAbsoluteTimeGetCurrent();
+}
+
 
 - (void) dealloc
 {
